@@ -1,0 +1,12 @@
+<library path="legged_robot_state_estimator">
+  <class name="legged_robot_state_estimator/HumanoidInEkfController"
+         type="legged_robot_state_estimator::HumanoidInEkfController"
+         base_class_type="controller_interface::ChainableControllerInterface">
+    <description>Contact-aided right-invariant EKF floating-base estimator.</description>
+  </class>
+  <class name="legged_robot_state_estimator/HumanoidLinearKfController"
+         type="legged_robot_state_estimator::HumanoidLinearKfController"
+         base_class_type="controller_interface::ChainableControllerInterface">
+    <description>Two-stage linear KF floating-base estimator with point and rolling-wheel contacts.</description>
+  </class>
+</library>
