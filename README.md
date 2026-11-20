@@ -34,6 +34,8 @@ source install/setup.bash
 
 Do not import a second copy of either package into a workspace that already contains it.
 Both MPC repositories include this package and the InEKF backend in their dependency manifests.
+To share one local checkout across workspaces, symlink that checkout into each workspace's `src/` instead of importing another copy.
+The current ROS controller reference interface exposes two support flags, matching the G1, H2, and Upkie integrations.
 
 
 ## Controller Configuration

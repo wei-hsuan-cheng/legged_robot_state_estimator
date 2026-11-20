@@ -28,8 +28,16 @@ The shared package builds in both the `ros_jazzy` and `turbompc_jazzy` container
 All six estimator tests pass in both environments, including loading both plugins and a stationary InEKF update with scheduled contacts.
 Structured YAML comparisons confirm the existing G1, H2, and Upkie estimator parameters are unchanged in both consumers.
 The optional TurboMPC H2 InEKF block matches the OCS2 H2 block.
-Pending: finish compiling both MPC consumers against the shared package.
+Both the TurboMPC and OCS2 consumers compile, and both installed controller libraries load against the shared package.
+The isolated Release consumer builds took approximately 7 minutes 24 seconds for TurboMPC and 17 minutes 32 seconds for OCS2.
+The builds report existing compiler warnings but no errors.
 Robot walking, driving, and push-recovery performance are not established by the extraction unit tests.
+
+Validation uses `/tmp/codex_estimator_build` and `/tmp/codex_estimator_install` inside each container.
+Consumer builds use `/tmp/codex_estimator_consumer_build` and `/tmp/codex_estimator_consumer_install`.
+Build logs are in `/tmp/codex_estimator_logs` and `/tmp/codex_estimator_consumer_logs`; test logs are in `/tmp/codex_estimator_test_logs`.
+The existing normal workspace installations were not replaced.
+Add the shared checkout to each normal workspace using the updated dependency manifest or a single symlink, then rebuild before launching.
 
 
 ## Future Work
