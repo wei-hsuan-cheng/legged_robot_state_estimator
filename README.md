@@ -32,6 +32,8 @@ colcon build --symlink-install --packages-up-to legged_robot_state_estimator --c
 source install/setup.bash
 ```
 
+The manifest places the backend under `src/legged_robot_state_estimator_dependencies/`.
+The shared estimator repository owns this dependency; consumer manifests do not need to name the backend.
 Do not import a second copy of either package into a workspace that already contains it.
 Both MPC repositories list only this shared estimator in their dependency manifests and import its internal dependencies through this package's own manifest.
 To share one local checkout across workspaces, symlink that checkout into each workspace's `src/` instead of importing another copy.

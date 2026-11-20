@@ -1,5 +1,5 @@
 repositories:
-  legged_state_estimator:
+  legged_robot_state_estimator_dependencies/legged_state_estimator:
     type: git
     url: https://github.com/wei-hsuan-cheng/legged_state_estimator.git
     version: jazzy
