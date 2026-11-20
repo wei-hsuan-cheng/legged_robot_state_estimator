@@ -1,0 +1,179 @@
+# H2 example: replace urdfFile with the expanded H2 URDF used by your application.
+# The URDF must contain the joint, IMU, and contact-frame names below.
+# Register both filters, but activate only the estimator selected by the consumer.
+# The consumer supplies scheduled contacts and a positive initialize_epoch.
+controller_manager:
+  ros__parameters:
+    update_rate: 1000
+
+    humanoid_inekf:
+      type: legged_robot_state_estimator/HumanoidInEkfController
+
+    humanoid_linear_kf:
+      type: legged_robot_state_estimator/HumanoidLinearKfController
+
+
+humanoid_inekf:
+  ros__parameters:
+    update_rate: 1000
+    urdfFile: /absolute/path/to/h2.urdf
+    baseFrame: pelvis
+    jointNames:
+      - left_hip_pitch_joint
+      - left_hip_roll_joint
+      - left_hip_yaw_joint
+      - left_knee_joint
+      - left_ankle_roll_joint
+      - left_ankle_pitch_joint
+
+      - right_hip_pitch_joint
+      - right_hip_roll_joint
+      - right_hip_yaw_joint
+      - right_knee_joint
+      - right_ankle_roll_joint
+      - right_ankle_pitch_joint
+
+      - waist_yaw_joint
+      - waist_roll_joint
+      - waist_pitch_joint
+
+      - head_pitch_joint
+      - head_yaw_joint
+
+      - left_shoulder_pitch_joint
+      - left_shoulder_roll_joint
+      - left_shoulder_yaw_joint
+      - left_elbow_joint
+
+      - right_shoulder_pitch_joint
+      - right_shoulder_roll_joint
+      - right_shoulder_yaw_joint
+      - right_elbow_joint
+
+    imuInterfaceName: pelvis_imu
+    imuFrame: imu_in_pelvis
+    contactFrames:
+      [foot_l_heel_est, foot_l_toe_est, foot_r_heel_est, foot_r_toe_est]
+    odomTopic: /humanoid/state_estimate/odom
+    odomFrame: odom
+    publishRate: 100.0
+
+    readiness:
+      minSeconds: 5.0
+      rollPitchStdDevMax: 0.10
+      heightStdDevMax: 0.10
+      velocityStdDevMax: 0.50
+
+    initialCovariance:
+      attitude: 0.01
+      velocity: 0.01
+      position: 0.01
+      gyroscopeBias: 0.001
+      accelerometerBias: 0.1
+    estimateImuBias: true
+
+    noise:
+      gyroscope: 1.0e-2
+      accelerometer: 1.5e0
+      gyroscopeBias: 1.0e-7
+      accelerometerBias: 1.0e-4
+      contact: 1.0e-2
+      contactPosition: 2.0e-3
+      contactRotation: 1.0e-2
+
+    height:
+      source: kinematic
+      kinematicWeight: 0.9
+      anchorUpdateThreshold: 0.05
+      groundZ: 0.0
+      holdThroughFlight: true
+
+    contact:
+      source: scheduled
+      footIndices: [0, 0, 1, 1]
+      beta0: [-7.0, -7.0, -7.0, -7.0]
+      beta1: [0.02, 0.02, 0.02, 0.02]
+      forceCovarianceAlpha: 1.0e-8
+      probabilityThreshold: 0.5
+      releaseThreshold: 0.05
+      pointForceRatio: 0.0
+      settleTime: 0.03
+      settleNoise: 0.05
+      dynamicEstimation: false
+      sensorInterfaces: [left_foot_contact/contact, right_foot_contact/contact]
+
+    lpf:
+      gyroCutoff: 80.0
+      gyroAccelCutoff: 50.0
+      linAccelCutoff: 15.0
+      dqJCutoff: 10.0
+      ddqJCutoff: 5.0
+      tauJCutoff: 50.0
+
+
+humanoid_linear_kf:
+  ros__parameters:
+    update_rate: 1000
+    urdfFile: /absolute/path/to/h2.urdf
+    baseFrame: pelvis
+    jointNames:
+      - left_hip_pitch_joint
+      - left_hip_roll_joint
+      - left_hip_yaw_joint
+      - left_knee_joint
+      - left_ankle_roll_joint
+      - left_ankle_pitch_joint
+
+      - right_hip_pitch_joint
+      - right_hip_roll_joint
+      - right_hip_yaw_joint
+      - right_knee_joint
+      - right_ankle_roll_joint
+      - right_ankle_pitch_joint
+
+      - waist_yaw_joint
+      - waist_roll_joint
+      - waist_pitch_joint
+
+      - head_pitch_joint
+      - head_yaw_joint
+
+      - left_shoulder_pitch_joint
+      - left_shoulder_roll_joint
+      - left_shoulder_yaw_joint
+      - left_elbow_joint
+
+      - right_shoulder_pitch_joint
+      - right_shoulder_roll_joint
+      - right_shoulder_yaw_joint
+      - right_elbow_joint
+
+    imuInterfaceName: pelvis_imu
+    imuFrame: imu_in_pelvis
+    contactFrames:
+      [foot_l_heel_est, foot_l_toe_est, foot_r_heel_est, foot_r_toe_est]
+    odomTopic: /humanoid/state_estimate/odom
+    odomFrame: odom
+    publishRate: 100.0
+
+    readiness:
+      minSeconds: 5.0
+      rollPitchStdDevMax: 0.10
+      heightStdDevMax: 0.10
+      velocityStdDevMax: 0.50
+
+    contact:
+      source: scheduled
+      footIndices: [0, 0, 1, 1]
+
+    contactModel: point
+    numFeet: 2
+    # Contact frames are at the soles, not at spherical-foot centers.
+    footRadius: 0.0
+    imuProcessNoisePosition: 0.02
+    imuProcessNoiseVelocity: 0.02
+    footProcessNoisePosition: 0.002
+    footSensorNoisePosition: 0.005
+    footSensorNoiseVelocity: 0.1
+    footHeightSensorNoise: 0.01
+    swingNoiseMultiplier: 100.0

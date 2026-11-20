@@ -53,7 +53,7 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC PLUGINLIB__DISABLE_BOOST_FUNCT
 pluginlib_export_plugin_description_file(controller_interface legged_robot_state_estimator_plugin.xml)
 
 install(DIRECTORY include/ DESTINATION include)
-install(DIRECTORY config docs DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 install(FILES README.md legged_robot_state_estimator_plugin.xml DESTINATION share/${PROJECT_NAME})
 install(TARGETS ${PROJECT_NAME} humanoid_inekf_parameters humanoid_linear_kf_parameters
   EXPORT export_${PROJECT_NAME}

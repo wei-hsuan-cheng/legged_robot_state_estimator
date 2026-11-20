@@ -33,8 +33,19 @@ source install/setup.bash
 ```
 
 Do not import a second copy of either package into a workspace that already contains it.
-Both MPC repositories include this package and the InEKF backend in their dependency manifests.
+Both MPC repositories list only this shared estimator in their dependency manifests and import its internal dependencies through this package's own manifest.
 To share one local checkout across workspaces, symlink that checkout into each workspace's `src/` instead of importing another copy.
+For example, from the workspace root:
+
+```bash
+ESTIMATOR_SOURCE=/absolute/path/to/legged_robot_state_estimator
+ln -s "$ESTIMATOR_SOURCE" src/legged_robot_state_estimator
+vcs import src < "$ESTIMATOR_SOURCE/legged_robot_state_estimator.repos"
+```
+
+Skip the symlink or dependency import when the corresponding package is already present.
+`colcon build --packages-up-to <consumer_package>` then discovers and builds the estimator through its declared dependencies.
+An external checkout that is neither under `src/` nor symlinked there is not discovered by the normal workspace build.
 The current ROS controller reference interface exposes two support flags, matching the G1, H2, and Upkie integrations.
 
 
@@ -52,11 +63,16 @@ controller_manager:
 ```
 
 The parameter schemas are [linear KF](config/humanoid_linear_kf_parameter.yaml) and [InEKF](config/humanoid_inekf_parameter.yaml).
+These build-time schemas belong to this package and are passed to `generate_parameter_library` in [CMakeLists.txt](CMakeLists.txt).
+They generate the typed parameter libraries during the build; they are not runtime controller configurations.
+The complete H2-based runtime example is [config/ros2_controllers.yaml](config/ros2_controllers.yaml), installed under this package's share directory.
+Replace its absolute URDF placeholder and adapt the joint, IMU, and contact-frame names for another robot.
+It registers both plugins, but the application should activate only its selected estimator because both publish the same odometry and base TF.
+Loading this YAML alone does not start estimation: the consumer must write a positive `initialize_epoch` and, for scheduled contacts, the two support flags through the reference interfaces.
 Supply `urdfFile`, `jointNames`, `baseFrame`, `imuInterfaceName`, `imuFrame`, and `contactFrames` for the robot.
-The existing MPC launches keep the `floatingBaseEstimator` argument and robot configuration values unchanged.
-The H2 TurboMPC configuration also provides an optional `humanoid_inekf` instance using the H2 OCS2 estimator settings.
-The default remains `humanoid_linear_kf`.
-The wheeled-biped configuration uses the linear KF's `rolling_wheel` model; the extracted InEKF does not implement that rolling-contact model.
+The MPC launches select the estimator with the `floatingBaseEstimator` argument.
+H2 defaults to `humanoid_linear_kf` and also supports `humanoid_inekf`.
+The wheeled-biped configuration uses the linear KF's `rolling_wheel` model; the InEKF does not implement that rolling-contact model.
 Use `contact.source: scheduled` for the linear KF; its no-contact-input overload assumes every contact is planted rather than detecting contact from torque.
 The rolling-wheel height observation still assumes a ground plane and does not estimate an unknown terrain map.
 
@@ -75,9 +91,6 @@ The consumer writes two scheduled-contact flags and an initialization epoch thro
 Odometry is published separately on the configured topic, normally `/humanoid/state_estimate/odom`.
 Control does not need to subscribe to that topic.
 
-Rebuild both the estimator and its consumers after migrating.
-The shared diagnostic interface includes the full OCS2 estimator diagnostics, so an old TurboMPC binary must not be mixed with the new interface headers.
-
 
 ## Tests
 
@@ -90,10 +103,7 @@ Tests cover stationary point contacts, rolling-wheel velocity and height, statio
 These checks do not replace robot-specific closed-loop acceptance tests.
 
 
-## Provenance
+## Models
 
-The ROS controller integration and filters were extracted from `legged_robot_mpc_controller` at `e7aa9ce0f91cae410dcca0016f8ccdab6a603baa`.
-The linear KF duplicated in `turbompc_controllers` at `c86b1c048335ff40eb784da0a923f46a992fbaa2` used the same filtering equations but fewer diagnostic fields.
-This extraction preserves the OCS2 implementation and adds no estimator tuning or filtering algorithms.
-The linear filter follows the two-stage Cheetah 3 design and its `legged_control` port; the invariant filter uses the existing contact-aided InEKF backend.
-See [handoff](docs/handoff.md) for migration and validation status.
+The linear filter follows the two-stage Cheetah 3 design and its `legged_control` port.
+The invariant filter uses the contact-aided InEKF backend.
