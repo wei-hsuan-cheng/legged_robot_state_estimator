@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pinocchio REQUIRED)
 find_package(legged_state_estimator REQUIRED)
+find_package(yaml-cpp REQUIRED)
 set(DEPENDENCIES
   controller_interface
   generate_parameter_library
@@ -47,6 +48,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   legged_state_estimator::legged_state_estimator
   humanoid_inekf_parameters
   humanoid_linear_kf_parameters
+  yaml-cpp
 )
 ament_target_dependencies(${PROJECT_NAME} PUBLIC ${DEPENDENCIES})
 target_compile_definitions(${PROJECT_NAME} PUBLIC PLUGINLIB__DISABLE_BOOST_FUNCTIONS)
@@ -72,5 +74,5 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(Eigen3 pinocchio legged_state_estimator ${DEPENDENCIES})
+ament_export_dependencies(Eigen3 pinocchio legged_state_estimator yaml-cpp ${DEPENDENCIES})
 ament_package()

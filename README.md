@@ -75,6 +75,7 @@ Supply `urdfFile`, `jointNames`, `baseFrame`, `imuInterfaceName`, `imuFrame`, an
 The MPC launches select the estimator with the `floatingBaseEstimator` argument.
 H2 defaults to `humanoid_linear_kf` and also supports `humanoid_inekf`.
 The wheeled-biped configuration uses the linear KF's `rolling_wheel` model; the InEKF does not implement that rolling-contact model.
+Its wheel geometry (`wheel.radius`, `wheel.centerOffset`, `wheel.axleAxis`) can come from a shared geometry file instead: set `geometryFile` to a YAML with a `geometry.wheel` map (`radius`, `center_offset`, `axle_axis`), the same file the MPC and offline tools read, and leave the three `wheel.*` values out of the parameter file, which is then refused if it repeats them.
 Use `contact.source: scheduled` for the linear KF; its no-contact-input overload assumes every contact is planted rather than detecting contact from torque.
 The rolling-wheel height observation still assumes a ground plane and does not estimate an unknown terrain map.
 

@@ -154,6 +154,11 @@ humanoid_linear_kf:
     description: "'point': planted contact points as landmarks (Cheetah 3). 'rolling_wheel': each contact frame is a wheel link rolling without slip on the ground plane; each wheel measures the base velocity (tread material at rest) and height (lowest tire point on the ground), and footProcessNoisePosition/footSensorNoisePosition are unused.",
     validation: { one_of<>: [["point", "rolling_wheel"]] }
   }
+  geometryFile: {
+    type: string,
+    default_value: "",
+    description: "Optional wheeled-biped geometry YAML shared with the MPC and offline tools (a geometry.wheel map: radius, center_offset, axle_axis). When set it supplies wheel.radius, wheel.centerOffset and wheel.axleAxis, which must then be left out of the parameter file.",
+  }
   wheel:
     radius: {
       type: double,

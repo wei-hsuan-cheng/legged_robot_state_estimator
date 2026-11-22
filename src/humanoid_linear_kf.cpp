@@ -2,6 +2,12 @@
 
 #include "legged_robot_state_estimator/humanoid_linear_kf.hpp"
 
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#include <yaml-cpp/yaml.h>
+
 #include "legged_robot_state_estimator/humanoid_linear_kf_parameters.hpp"
 
 namespace legged_robot_state_estimator
@@ -11,7 +17,36 @@ struct HumanoidLinearKf::Params
 {
   std::shared_ptr<humanoid_linear_kf::ParamListener> listener;
   humanoid_linear_kf::Params values;
+  std::weak_ptr<rclcpp_lifecycle::LifecycleNode> node;
 };
+
+namespace
+{
+
+// geometryFile: the wheel radius, tire centre and axle shared with the MPC and the offline tools. The file is the
+// single source, so the same values in the parameter file are refused rather than silently overridden.
+void applyGeometryFile(humanoid_linear_kf::Params & p, rclcpp_lifecycle::LifecycleNode & node)
+{
+  const auto overrides = node.get_node_parameters_interface()->get_parameter_overrides();
+  for (const char * name : {"wheel.radius", "wheel.centerOffset", "wheel.axleAxis"}) {
+    if (overrides.count(name) > 0) {
+      throw std::invalid_argument(std::string(name) + " comes from geometryFile; remove it from the parameter file");
+    }
+  }
+  const YAML::Node wheel = YAML::LoadFile(p.geometryFile)["geometry"]["wheel"];
+  if (!wheel) {
+    throw std::invalid_argument("geometry " + p.geometryFile + " has no 'geometry.wheel' map");
+  }
+  p.wheel.radius = wheel["radius"].as<double>();
+  p.wheel.centerOffset = wheel["center_offset"].as<std::vector<double>>();
+  p.wheel.axleAxis = wheel["axle_axis"].as<std::vector<double>>();
+  if (!(p.wheel.radius > 0.0) || p.wheel.centerOffset.size() != 3 || p.wheel.axleAxis.size() != 3) {
+    throw std::invalid_argument(
+      "geometry " + p.geometryFile + ": wheel needs radius > 0 and three-element center_offset and axle_axis");
+  }
+}
+
+}  // namespace
 
 HumanoidLinearKf::HumanoidLinearKf() : HumanoidStateEstimator("humanoid_linear_kf") {}
 HumanoidLinearKf::~HumanoidLinearKf() = default;
@@ -21,6 +56,7 @@ bool HumanoidLinearKf::declareParameters(const std::shared_ptr<rclcpp_lifecycle:
   try {
     params_ = std::make_unique<Params>();
     params_->listener = std::make_shared<humanoid_linear_kf::ParamListener>(node);
+    params_->node = node;
   } catch (const std::exception & e) {
     RCLCPP_ERROR(
       node->get_logger(), "[%s] declaring parameters failed: %s", name().c_str(), e.what());
@@ -36,6 +72,21 @@ bool HumanoidLinearKf::readParameters(
     return false;
   }
   params_->values = params_->listener->get_params();
+  if (!params_->values.geometryFile.empty()) {
+    const auto node = params_->node.lock();
+    if (!node) {
+      return false;
+    }
+    try {
+      applyGeometryFile(params_->values, *node);
+    } catch (const std::exception & e) {
+      RCLCPP_ERROR(node->get_logger(), "[%s] %s", name().c_str(), e.what());
+      return false;
+    }
+    RCLCPP_INFO(
+      node->get_logger(), "[%s] wheel geometry from %s: radius %.4f m", name().c_str(),
+      params_->values.geometryFile.c_str(), params_->values.wheel.radius);
+  }
   const auto & p = params_->values;
 
   common.urdf_file = p.urdfFile;
