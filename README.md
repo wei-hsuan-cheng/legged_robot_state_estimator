@@ -77,7 +77,11 @@ H2 defaults to `humanoid_linear_kf` and also supports `humanoid_inekf`.
 The wheeled-biped configuration uses the linear KF's `rolling_wheel` model; the InEKF does not implement that rolling-contact model.
 Its wheel geometry (`wheel.radius`, `wheel.centerOffset`, `wheel.axleAxis`) can come from a shared geometry file instead: set `geometryFile` to a YAML with a `geometry.wheel` map (`radius`, `center_offset`, `axle_axis`), the same file the MPC and offline tools read, and leave the three `wheel.*` values out of the parameter file, which is then refused if it repeats them.
 Use `contact.source: scheduled` for the linear KF; its no-contact-input overload assumes every contact is planted rather than detecting contact from torque.
-The rolling-wheel height observation still assumes a ground plane and does not estimate an unknown terrain map.
+By default the rolling-wheel height observation pins every tire to the ground plane.
+`wheel.terrain.enabled: true` instead estimates the ground height under each tire, so a stepping gait can put one tire on a step while the other holds the base height.
+Each tire's ground estimate barely moves while the tire is in contact (`wheel.terrain.groundProcessNoise`). It is free while the tire swings and is fixed again at touchdown.
+Only the mean ground height is anchored to the plane, weakly (`wheel.terrain.groundAnchorNoise`).
+With both tires on the ground, a tire rolling onto a step is still averaged as on the plane, because the estimator has no terrain map.
 
 
 ## Consumer Interface
@@ -102,7 +106,7 @@ colcon test --packages-select legged_robot_state_estimator --event-handlers cons
 colcon test-result --verbose
 ```
 
-Tests cover stationary point contacts, rolling-wheel velocity and height, stationary InEKF updates, interface packing, plugin discovery/loading, and invalid contact models.
+Tests cover stationary point contacts, rolling-wheel velocity and height, a tire set down on a step with and without per-tire ground, stationary InEKF updates, interface packing, plugin discovery/loading, and invalid contact models.
 These checks do not replace robot-specific closed-loop acceptance tests.
 
 

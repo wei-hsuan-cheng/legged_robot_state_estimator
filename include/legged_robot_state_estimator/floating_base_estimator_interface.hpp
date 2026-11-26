@@ -135,6 +135,17 @@ struct EstimatorSettings
   double lkf_wheel_radius{0.0};                                       //!< [m]
   Eigen::Vector3d lkf_wheel_center_offset{Eigen::Vector3d::Zero()};  //!< tire centre in the wheel frame [m]
   Eigen::Vector3d lkf_wheel_axle_axis{Eigen::Vector3d::UnitZ()};       //!< axle direction in the wheel frame
+  //! Rolling wheels on uneven ground: the ground height under each tire is a state, nearly fixed while the tire is in
+  //! contact and free while it swings, so a tire put down on higher or lower ground latches that height instead of
+  //! being pinned to the plane. Only the mean ground is anchored to height_ground_z, weakly.
+  bool lkf_wheel_terrain{false};
+  double lkf_wheel_ground_process_noise{1e-4};   //!< ground height random walk under a tire in contact [m^2/s]
+  double lkf_wheel_ground_anchor_noise{1.0};     //!< variance of the mean-ground = height_ground_z row, per update
+  //! Rolling wheels: a tire in contact whose tread velocity differs from the predicted base velocity along its
+  //! rolling direction by more than this [m/s] is taken as spinning, and its velocity along that direction is
+  //! ignored for that update (sideways scrub is not tested). 0: off.
+  double lkf_wheel_slip_gate{0.0};
+  double lkf_wheel_slip_max_time{0.5};   //!< longest a tire is ignored in a row before it is trusted again [s]
   //! Remove the IMU mounting (imu_frame relative to the base) from attitude, rate and acceleration.
   bool lkf_imu_extrinsics{false};
 
@@ -234,6 +245,7 @@ struct EstimatorDiagnostics
   //! Stance flag the filter used this tick, whatever the contact source.
   double foot_stance_left{0.0};
   double foot_stance_right{0.0};
+  int slipping_wheels{0};   //!< rolling wheels: tires whose velocity rows the slip gate ignored this update
   //! Torque-estimated normal force [N]. Computed every tick, also when the contacts come from
   //! the schedule or a sensor, so the torque detector can be judged against them live.
   double foot_normal_force_left{0.0};

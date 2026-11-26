@@ -72,6 +72,61 @@ TEST(Estimator, RollingWheelUsesTreadVelocity)
   EXPECT_NEAR(filter.diagnostics().reported_height, estimate.position.z(), 1e-12);
 }
 
+TEST(Estimator, RollingWheelTerrainLatchesAStep)
+{
+  // The left tire swings and is set down on a 40 mm step while the right one stays on the floor. The test robot has
+  // no legs, so the step shows as the base rolled until the tires' contact points differ by 40 mm (wheels at
+  // y = +-0.1 m, centres 0.25 m below the base, radius 0.055 m). On the floor the right tire puts the base at
+  // 0.305 cos(roll) + 0.1 sin(roll); the plane model instead averages the two tires to 0.305 cos(roll).
+  auto s = settings("rolling_wheel");
+  const std::vector<double> zero(2, 0.0);
+  const double roll = std::asin(0.04 / 0.2);
+  const auto height_after_step = [&](bool terrain) {
+    s.lkf_wheel_terrain = terrain;
+    se::LinearKfFloatingBaseEstimator filter(s);
+    filter.initializeFromStance(Eigen::Quaterniond::Identity(), zero);
+    const Eigen::Vector3d gyro = Eigen::Vector3d::Zero(), specific_force(0, 0, 9.81);
+    for (int i = 0; i < 400; ++i) {
+      filter.update(gyro, specific_force, zero, zero, zero, {true, true});
+    }
+    for (int i = 1; i <= 200; ++i) {   // left tire in swing, the base rolling over onto the step
+      filter.setBaseOrientation(Eigen::Quaterniond(Eigen::AngleAxisd(roll * i / 200.0, Eigen::Vector3d::UnitX())));
+      filter.update(gyro, specific_force, zero, zero, zero, {false, true});
+    }
+    se::FloatingBaseEstimate estimate;
+    for (int i = 0; i < 400; ++i) {
+      estimate = filter.update(gyro, specific_force, zero, zero, zero, {true, true});
+    }
+    return estimate.position.z();
+  };
+  EXPECT_NEAR(height_after_step(true), 0.305 * std::cos(roll) + 0.1 * std::sin(roll), 3e-3);
+  EXPECT_NEAR(height_after_step(false), 0.305 * std::cos(roll), 3e-3);
+}
+
+TEST(Estimator, RollingWheelSlipGateIgnoresASpinningTire)
+{
+  // Standing still, the left tire spins up to 2 m/s of tread speed against an edge (within slip_max_time). Without
+  // the gate the base velocity follows the average tread; with it the spinning tire is ignored and the base stays.
+  auto s = settings("rolling_wheel");
+  const std::vector<double> zero(2, 0.0);
+  const auto speed_after_spin = [&](double gate) {
+    s.lkf_wheel_slip_gate = gate;
+    se::LinearKfFloatingBaseEstimator filter(s);
+    filter.initializeFromStance(Eigen::Quaterniond::Identity(), zero);
+    se::FloatingBaseEstimate estimate;
+    for (int i = 0; i < 150; ++i) {
+      const double tread = std::min(2.0, i * 0.02);   // spin-up over the first 100 updates
+      // Joint order: right, left (controller_joint_names).
+      const std::vector<double> velocity{0.0, tread / s.lkf_wheel_radius};
+      estimate = filter.update(
+        Eigen::Vector3d::Zero(), Eigen::Vector3d(0, 0, 9.81), zero, velocity, zero, {true, true});
+    }
+    return std::abs(estimate.linear_velocity_world.x());
+  };
+  EXPECT_GT(speed_after_spin(0.0), 0.5);
+  EXPECT_LT(speed_after_spin(0.3), 0.05);
+}
+
 TEST(Estimator, SharedInterfaceRoundTrip)
 {
   se::FloatingBaseEstimate estimate;

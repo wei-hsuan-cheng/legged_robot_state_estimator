@@ -178,6 +178,36 @@ humanoid_linear_kf:
       description: "Axle direction in the wheel (contact) frame.",
       validation: { fixed_size<>: [3] }
     }
+    slipGate: {
+      type: double,
+      default_value: 0.0,
+      description: "Slip rejection for contactModel rolling_wheel [m/s]: a tire in contact whose tread velocity differs from the IMU-propagated base velocity along its rolling direction by more than this is taken as spinning (blocked by an edge, spun up off a corner) and its velocity along the rolling direction is ignored for that update (its sideways and vertical velocity and its height still count); sideways scrub, which stepping sideways causes, is not tested. 0: off.",
+      validation: { gt_eq: [0.0] }
+    }
+    slipMaxTime: {
+      type: double,
+      default_value: 0.5,
+      description: "Longest a tire is ignored by slipGate in a row [s]; then it is trusted again, so an estimate that has drifted cannot lock every tire out.",
+      validation: { gt: [0.0] }
+    }
+    terrain:
+      enabled: {
+        type: bool,
+        default_value: false,
+        description: "Uneven ground for contactModel rolling_wheel: estimate the ground height under each tire (nearly fixed in contact, free in swing, latched at touch-down) instead of pinning every tire to the plane; only the mean ground is anchored to the plane, weakly. Lets a stepping gait put a tire on a step while the other tire holds the base height.",
+      }
+      groundProcessNoise: {
+        type: double,
+        default_value: 0.0001,
+        description: "Random walk [m^2/s] of the ground height under a tire in contact; a swinging tire's is multiplied by swingNoiseMultiplier squared.",
+        validation: { gt: [0.0] }
+      }
+      groundAnchorNoise: {
+        type: double,
+        default_value: 1.0,
+        description: "Variance of the row holding the mean ground height at the plane, per update. Larger: slower return of the mean to the plane after the robot climbs.",
+        validation: { gt: [0.0] }
+      }
   imuExtrinsics: {
     type: bool,
     default_value: false,

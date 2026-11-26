@@ -91,9 +91,11 @@ LinearKfFloatingBaseEstimator::LinearKfFloatingBaseEstimator(const EstimatorSett
 
   dim_contacts_ = 3 * num_contacts_;
   if (rolling_wheels_) {
-    // [base position, base velocity]; per wheel 3 velocity rows, then one height row per wheel.
-    num_state_ = 6;
-    num_observe_ = 4 * num_contacts_;
+    // [base position, base velocity (, ground height under each tire)]; per wheel 3 velocity rows, then one height
+    // row per wheel (base height minus that tire's ground), then with terrain one row anchoring the mean ground.
+    wheel_terrain_ = settings_.lkf_wheel_terrain;
+    num_state_ = 6 + (wheel_terrain_ ? num_contacts_ : 0);
+    num_observe_ = 4 * num_contacts_ + (wheel_terrain_ ? 1 : 0);
     x_hat_.setZero(num_state_);
     vs_.setZero(dim_contacts_);
     a_.setIdentity(num_state_, num_state_);
@@ -102,6 +104,10 @@ LinearKfFloatingBaseEstimator::LinearKfFloatingBaseEstimator(const EstimatorSett
     for (Eigen::Index i = 0; i < num_contacts_; ++i) {
       c_.block(3 * i, 3, 3, 3) = Eigen::Matrix3d::Identity();
       c_(dim_contacts_ + i, 2) = 1.0;
+      if (wheel_terrain_) {
+        c_(dim_contacts_ + i, 6 + i) = -1.0;
+        c_(4 * num_contacts_, 6 + i) = 1.0 / static_cast<double>(num_contacts_);
+      }
     }
     q_.setIdentity(num_state_, num_state_);
     p_ = 100.0 * q_;
@@ -184,6 +190,12 @@ void LinearKfFloatingBaseEstimator::initialize(
   x_hat_.segment<3>(0) = base_position;
   if (rolling_wheels_) {
     p_ = 100.0 * Eigen::MatrixXd::Identity(num_state_, num_state_);
+    if (wheel_terrain_) {
+      // The robot starts on the plane: the tires' ground is known, the base height follows from it.
+      x_hat_.tail(num_contacts_).setConstant(settings_.height_ground_z);
+      p_.bottomRightCorner(num_contacts_, num_contacts_) =
+        1e-6 * Eigen::MatrixXd::Identity(num_contacts_, num_contacts_);
+    }
     initialized_ = true;
     return;
   }
@@ -486,23 +498,66 @@ FloatingBaseEstimate LinearKfFloatingBaseEstimator::updateRollingWheels(
     Eigen::Vector3d position, material_velocity;
     wheelContact(i, position, material_velocity);
     y.segment<3>(3 * i) = -material_velocity;
-    y(dim_contacts_ + i) = settings_.height_ground_z - position.z();
+    // Plane: base height = ground - contact (relative). Terrain: base height - this tire's ground = -contact.
+    y(dim_contacts_ + i) = (wheel_terrain_ ? 0.0 : settings_.height_ground_z) - position.z();
     // An airborne wheel spins freely and its tread is not at rest: inflate rather than drop its
     // rows, which keeps the dimensions fixed across contact changes.
     const bool in_contact = wheel_contact_flags[static_cast<size_t>(i)];
     const double scale = in_contact ? 1.0 : settings_.lkf_swing_noise_multiplier;
     r.block(3 * i, 3 * i, 3, 3) *= settings_.lkf_foot_sensor_noise_velocity * scale;
     r(dim_contacts_ + i, dim_contacts_ + i) *= settings_.lkf_foot_height_sensor_noise * scale;
+    if (wheel_terrain_) {
+      // The ground under a tire in contact barely moves; under a swinging one it is unknown until touch-down, so its
+      // random walk is inflated as much as its rows (the height it lands on is latched then).
+      const double ground_noise = in_contact ? settings_.lkf_wheel_ground_process_noise
+                                             : settings_.lkf_wheel_ground_process_noise * scale * scale;
+      q(6 + i, 6 + i) = dt * ground_noise;
+    }
     if (in_contact) {
       ++stance;
-      height_sum += y(dim_contacts_ + i);
+      height_sum += y(dim_contacts_ + i) + (wheel_terrain_ ? x_hat_(6 + i) : 0.0);
     }
+  }
+  if (wheel_terrain_) {
+    y(4 * num_contacts_) = settings_.height_ground_z;
+    r(4 * num_contacts_, 4 * num_contacts_) = settings_.lkf_wheel_ground_anchor_noise;
   }
 
   const Eigen::Vector3d gravity(0.0, 0.0, -9.81);
   const Eigen::Vector3d accel_world = base_orientation_ * base_linear_acceleration + gravity;
   x_hat_ = a_ * x_hat_ + b_ * accel_world;
   const Eigen::MatrixXd p_minus = a_ * p_ * a_.transpose() + q;
+
+  // Slip: a tire in contact whose tread velocity disagrees with the IMU-propagated base velocity along its rolling
+  // direction by more than the gate is spinning (blocked by an edge, spun up off a corner). Spin only corrupts the
+  // rolling direction, so only that direction of its velocity rows is ignored this update; its sideways and vertical
+  // velocity and its height still count. Sideways disagreement is not tested: a tire scrubs sideways whenever the
+  // robot steps sideways. A tire ignored for longer than slip_max_time in a row is trusted again, so an estimate that
+  // has drifted cannot lock every tire out.
+  int slipping = 0;
+  if (settings_.lkf_wheel_slip_gate > 0.0) {
+    slip_time_.resize(static_cast<size_t>(num_contacts_), 0.0);
+    for (Eigen::Index i = 0; i < num_contacts_; ++i) {
+      double & slip_time = slip_time_[static_cast<size_t>(i)];
+      const Eigen::Vector3d disagreement = y.segment<3>(3 * i) - x_hat_.segment<3>(3);
+      const Eigen::Vector3d axle =
+        data_->oMf[contact_frame_ids_[static_cast<size_t>(i)]].rotation() * settings_.lkf_wheel_axle_axis;
+      Eigen::Vector3d rolling = axle.cross(Eigen::Vector3d::UnitZ());
+      rolling = rolling.norm() > 1e-6 ? Eigen::Vector3d(rolling.normalized()) : Eigen::Vector3d::Zero();
+      if (!wheel_contact_flags[static_cast<size_t>(i)] ||
+        std::abs(rolling.dot(disagreement)) <= settings_.lkf_wheel_slip_gate ||
+        slip_time >= settings_.lkf_wheel_slip_max_time)
+      {
+        slip_time = 0.0;
+        continue;
+      }
+      slip_time += dt;
+      // Inflate the covariance along the rolling direction only.
+      r.block(3 * i, 3 * i, 3, 3) += (settings_.lkf_swing_noise_multiplier - 1.0) *
+        r(3 * i, 3 * i) * rolling * rolling.transpose();
+      ++slipping;
+    }
+  }
 
   const Eigen::VectorXd innovation = y - c_ * x_hat_;
   const Eigen::MatrixXd s = c_ * p_minus * c_.transpose() + r;
@@ -524,6 +579,7 @@ FloatingBaseEstimate LinearKfFloatingBaseEstimator::updateRollingWheels(
   diagnostics_.reported_height = x_hat_(2);
   diagnostics_.foot_stance_left = num_contacts_ > 0 && wheel_contact_flags[0] ? 1.0 : 0.0;
   diagnostics_.foot_stance_right = num_contacts_ > 1 && wheel_contact_flags[1] ? 1.0 : 0.0;
+  diagnostics_.slipping_wheels = slipping;
 
   FloatingBaseEstimate estimate;
   estimate.position = x_hat_.segment<3>(0);

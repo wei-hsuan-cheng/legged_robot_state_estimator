@@ -120,6 +120,11 @@ bool HumanoidLinearKf::readParameters(
   filter.lkf_wheel_center_offset = Eigen::Vector3d(p.wheel.centerOffset[0], p.wheel.centerOffset[1], p.wheel.centerOffset[2]);
   filter.lkf_wheel_axle_axis = Eigen::Vector3d(p.wheel.axleAxis[0], p.wheel.axleAxis[1], p.wheel.axleAxis[2]);
   filter.lkf_imu_extrinsics = p.imuExtrinsics;
+  filter.lkf_wheel_terrain = p.wheel.terrain.enabled;
+  filter.lkf_wheel_slip_gate = p.wheel.slipGate;
+  filter.lkf_wheel_slip_max_time = p.wheel.slipMaxTime;
+  filter.lkf_wheel_ground_process_noise = p.wheel.terrain.groundProcessNoise;
+  filter.lkf_wheel_ground_anchor_noise = p.wheel.terrain.groundAnchorNoise;
   return true;
 }
 

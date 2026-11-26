@@ -57,6 +57,10 @@ namespace legged_robot_state_estimator::state_estimation
  *     base height   = ground - (contact point relative to the base).z            (1 row)
  * with the contact at the lowest point of the tire circle, and the state is the base
  * position and velocity only (6). Wheel spin enters through the wheel joint velocity.
+ * With lkf_wheel_terrain the ground under each tire is a state too (6 + N): a height row
+ * reads base height - that tire's ground, the ground random-walks slowly in contact and
+ * freely in swing, and one row anchors the MEAN ground to height_ground_z, weakly. A tire
+ * set down on a step latches the step's height while the other tire holds the base height.
  * Hosseini, Rodriguez and Behnke (IRC 2022) adapt legged filters to wheels the same way.
  */
 class LinearKfFloatingBaseEstimator : public FloatingBaseEstimatorInterface
@@ -156,6 +160,8 @@ private:
   bool initialized_{false};
 
   bool rolling_wheels_{false};
+  bool wheel_terrain_{false};   //!< rolling wheels with a ground height state per tire
+  std::vector<double> slip_time_;   //!< per tire: how long the slip gate has ignored its rolling direction [s]
   bool imu_extrinsics_{false};
   Eigen::Quaterniond base_to_imu_{Eigen::Quaterniond::Identity()};   //!< IMU attitude in the base frame
   Eigen::Vector3d imu_position_base_{Eigen::Vector3d::Zero()};       //!< IMU position in the base frame
