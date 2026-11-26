@@ -72,7 +72,7 @@ Replace its absolute URDF placeholder and adapt the joint, IMU, and contact-fram
 It registers both plugins, but the application should activate only its selected estimator because both publish the same odometry and base TF.
 Loading this YAML alone does not start estimation: the consumer must write a positive `initialize_epoch` and, for scheduled contacts, the two support flags through the reference interfaces.
 Supply `urdfFile`, `jointNames`, `baseFrame`, `imuInterfaceName`, `imuFrame`, and `contactFrames` for the robot.
-The MPC launches select the estimator with the `floatingBaseEstimator` argument.
+The MPC launches select the estimator with the `floating_base_estimator` argument.
 H2 defaults to `humanoid_linear_kf` and also supports `humanoid_inekf`.
 The wheeled-biped configuration uses the linear KF's `rolling_wheel` model; the InEKF does not implement that rolling-contact model.
 Its wheel geometry (`wheel.radius`, `wheel.centerOffset`, `wheel.axleAxis`) can come from a shared geometry file instead: set `geometryFile` to a YAML with a `geometry.wheel` map (`radius`, `center_offset`, `axle_axis`), the same file the MPC and offline tools read, and leave the three `wheel.*` values out of the parameter file, which is then refused if it repeats them.
